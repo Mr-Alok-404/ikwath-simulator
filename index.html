@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AYUSWASTH IKWATH Simulator</title>
+<style>
+* { box-sizing: border-box; }
+
+:root {
+    --bg-main: #f8fafc; 
+    --bg-panel: #ffffff; 
+    --border: #e2e8f0;
+    --text-main: #334155;
+    --muted: #64748b;
+    
+    --green: #10b981;
+    --blue: #3b82f6;
+    --cyan: #0ea5e9;
+    --yellow: #f59e0b;
+    --gold: #b45309;
+    --red: #ef4444;
+}
+
+body { margin: 0; background: var(--bg-main); color: var(--text-main); font-family: 'Inter', 'Segoe UI', sans-serif; overflow-x: hidden; }
+button, input, select { font: inherit; }
+button { cursor: pointer; border: none; }
+
+/* HEADER */
+.header { height: 65px; display: flex; align-items: center; padding: 0 30px; background: var(--bg-panel); border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.logo { font-size: 22px; font-weight: 900; letter-spacing: 0.5px; color: var(--text-main); }
+.logo span { color: var(--blue); font-weight: 300; }
+.subtitle { margin-left: 20px; color: var(--muted); font-size: 13px; font-weight: 500;}
+.header-buttons { margin-left: auto; display: flex; gap: 12px; }
+.header-buttons button { border-radius: 6px; padding: 8px 16px; color: white; font-weight: 600; font-size: 12px; letter-spacing: 0.5px; transition: opacity 0.2s; }
+.header-buttons button:hover { opacity: 0.85; }
+.run { background: var(--green); box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3); }
+.reset { background: var(--muted); }
+
+/* MAIN LAYOUT */
+.main { display: flex; flex-direction: column; min-height: calc(100vh - 65px); }
+
+/* VIRTUAL CIRCUIT */
+.circuit {
+    padding: 40px 30px; 
+    background-color: var(--bg-main);
+    border-bottom: 1px solid var(--border); 
+    overflow-x: auto;
+}
+.circuit-title { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; margin-bottom: 35px; text-transform: uppercase; text-align: center; }
+
+/* PROCESS PATH */
+.process-path { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 1300px; padding-bottom: 20px; margin: 0 auto; }
+
+/* CONNECTORS */
+.process-arrow {
+    width: 40px; height: 4px;
+    background-color: var(--border); 
+    border-radius: 2px;
+    position: relative; 
+    overflow: hidden;
+}
+.process-arrow::after { 
+    content: ''; 
+    position: absolute; 
+    top: 0; left: 0; right: 0; bottom: 0; 
+    background-image: linear-gradient(90deg, var(--blue) 0%, var(--blue) 50%, transparent 50%, transparent 100%);
+    background-size: 12px 100%;
+    opacity: 0; 
+}
+.process-arrow.active::after { 
+    opacity: 1; 
+    animation: flowPipe 0.4s linear infinite; 
+}
+@keyframes flowPipe { 
+    0% { background-position: 0 0; } 
+    100% { background-position: 12px 0; } 
+}
+
+/* NODES (Components) */
+.component {
+    position: relative; width: 130px; height: 160px; background: var(--bg-panel);
+    border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column;
+    align-items: center; padding: 15px 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease; flex-shrink: 0;
+}
+.component.active { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); transform: translateY(-2px); }
+
+/* PORTS */
+.port-in, .port-out {
+    position: absolute; width: 8px; height: 8px; border: 2px solid #94a3b8; border-radius: 50%;
+    background: var(--bg-panel); top: 50%; transform: translateY(-50%); z-index: 2;
+}
+.port-in { left: -5px; }
+.port-out { right: -5px; }
+.active .port-in, .active .port-out { border-color: var(--blue); background: var(--blue); }
+
+.component-title { color: var(--text-main); font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; text-align: center; }
+.status-text { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--muted); font-family: 'Courier New', monospace; }
+
+/* VISUAL ICONS & ANIMATIONS */
+.visual-container { margin-top: 15px; display: flex; justify-content: center; align-items: center; width: 100%; flex-grow: 1; position: relative; }
+
+/* Tank */
+.tank-visual { width: 55px; height: 65px; border: 2px solid #94a3b8; border-radius: 4px 4px 10px 10px; background: #f1f5f9; position: relative; overflow: hidden; }
+.tank-water { position: absolute; bottom: 0; width: 100%; background: var(--cyan); transition: height 0.5s linear; opacity: 0.8;}
+
+/* Pump */
+.pump-icon { width: 45px; height: 45px; border: 4px solid #94a3b8; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.3s; background: #f1f5f9;}
+.pump-icon::after { content: ''; width: 12px; height: 12px; background: #94a3b8; border-radius: 50%; }
+.active .pump-icon { border-color: var(--blue); animation: pulsePump 1s infinite; }
+.active .pump-icon::after { background: var(--blue); }
+@keyframes pulsePump { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+/* Flow Sensor */
+.sensor-symbol { width: 45px; height: 45px; border: 3px solid var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--blue); font-weight: bold; font-size: 18px; background: #eff6ff;}
+.active .sensor-symbol { animation: spin 2s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* Powder Hopper / Servo */
+.hopper-visual { width: 45px; height: 45px; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 35px solid #94a3b8; position: relative; }
+.powder-drop { position: absolute; bottom: -20px; left: -5px; width: 10px; height: 10px; background: var(--gold); border-radius: 50%; opacity: 0; }
+.active .powder-drop { animation: dropPowder 0.6s linear infinite; }
+@keyframes dropPowder { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(30px); opacity: 0; } }
+
+/* Aluminum Pot & Heater */
+.pot-visual { width: 60px; height: 50px; border: 3px solid #94a3b8; border-radius: 4px 4px 12px 12px; background: #f1f5f9; position: relative; overflow: hidden; border-top: none; margin-bottom: 8px; }
+.pot-liquid { position: absolute; bottom: 0; width: 100%; height: 0%; background: #b45309; transition: height 0.5s linear; opacity: 0.9;}
+.heater-element { width: 45px; height: 6px; background: #cbd5e1; border-radius: 4px; position: absolute; bottom: 5px; }
+.active .heater-element { background: var(--red); box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4); }
+
+/* Exhaust Fan & Steam */
+.fan-housing { width: 45px; height: 45px; border: 3px solid #94a3b8; border-radius: 50%; display: flex; justify-content: center; align-items: center; position: relative; background: #f1f5f9;}
+.fan-blades { width: 35px; height: 35px; background: conic-gradient(from 0deg, #94a3b8 0deg 40deg, transparent 40deg 90deg, #94a3b8 90deg 130deg, transparent 130deg 180deg, #94a3b8 180deg 220deg, transparent 220deg 270deg, #94a3b8 270deg 310deg, transparent 310deg 360deg); border-radius: 50%; }
+.active .fan-blades { animation: spin 0.2s linear infinite; }
+.steam { position: absolute; top: -10px; width: 20px; height: 20px; background: rgba(148, 163, 184, 0.4); border-radius: 50%; filter: blur(4px); opacity: 0; }
+.active .steam { animation: riseSteam 1.5s ease-in infinite; }
+@keyframes riseSteam { 0% { transform: translateY(0) scale(1); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(-40px) scale(2); opacity: 0; } }
+
+/* Valve */
+.valve-symbol { width: 25px; height: 25px; border: 4px solid #94a3b8; transform: rotate(45deg); }
+.valve-symbol.open { border-color: var(--blue); background: #eff6ff; }
+
+/* Cup */
+.cup-visual { width: 50px; height: 50px; border: 3px solid #94a3b8; border-top: none; border-radius: 0 0 10px 10px; position: relative; overflow: hidden; background: #f8fafc; }
+.cup-liquid { position: absolute; bottom: 0; width: 100%; height: 0; background: #b45309; transition: height 0.5s linear; opacity: 0.9;}
+
+/* CONTROL AREA */
+.control-zone { margin-top: 40px; display: flex; justify-content: center; gap: 30px; align-items: stretch; }
+.connection-box { padding: 15px 20px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; width: 260px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+.box-title { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.connection-item { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 10px; color: var(--text-main); }
+.val { font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; color: var(--blue); }
+
+.esp32-board { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; position: relative; width: 280px;}
+.esp-chip { background: #334155; width: 110px; height: 60px; margin: 0 auto; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: white; }
+.blynk-chip { background: #ecfdf5; border: 1px solid #10b981; width: 110px; height: 35px; margin: 15px auto 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: #047857; }
+.blynk-indicator { width: 8px; height: 8px; background: #10b981; border-radius: 50%; display: inline-block; margin-right: 6px; animation: blink 1s infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* BOTTOM DASHBOARD (3 Columns) */
+.dashboard { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 24px; padding: 30px; background: var(--bg-main); }
+.dashboard-col { display: flex; flex-direction: column; gap: 20px; }
+
+.panel { padding: 20px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(0,0,0,0.02);}
+.panel.h-100 { height: 100%; }
+.panel-title { color: var(--text-main); font-size: 11px; font-weight: 700; letter-spacing: 1px; margin-bottom: 15px; text-transform: uppercase; }
+
+.status { padding: 12px; text-align: center; border-radius: 6px; background: #f8fafc; color: var(--text-main); font-size: 13px; font-weight: 700; border: 1px solid var(--border); }
+.status.running { color: #047857; background: #ecfdf5; border-color: #10b981; }
+.status.stopped { color: #b91c1c; background: #fef2f2; border-color: #ef4444; }
+
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.metric { padding: 15px; background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; text-align: center; }
+.metric-label { color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+.metric-value { margin-top: 8px; font-size: 20px; font-weight: 700; color: var(--text-main); }
+
+.input-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; font-weight: 600;}
+.input-row select { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: #f8fafc; color: var(--text-main); outline: none;}
+
+.process-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.process-step { padding: 12px 6px; background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; text-align: center; transition: all 0.2s;}
+.process-step.active { background: var(--blue); border-color: var(--blue); color: white; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);}
+.process-step.done { border-color: var(--blue); color: var(--blue); background: #eff6ff;}
+
+.serial { flex-grow: 1; overflow-y: auto; padding: 15px; background: #1e293b; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 12px; color: #4ade80; white-space: pre-wrap; line-height: 1.5; min-height: 180px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);}
+</style>
+</head>
+<body>
+
+<header class="header">
+    <div class="logo">AYUSWASTH</div>
+    <div class="subtitle">OUTR, BHUBANESWAR</div>
+    <div class="header-buttons">
+        <button class="run" onclick="startSim()">▶ START</button>
+        <button class="reset" onclick="resetSim()">↻ RESET SYSTEM</button>
+    </div>
+</header>
+
+<main class="main">
+<!-- TOP SECTION: HARDWARE & CONTROLS -->
+<section class="circuit">
+    <div class="circuit-title">Virtual Hardware Pipeline</div>
+    <div class="process-path">
+        
+        <div id="cmp-tank" class="component">
+            <span class="port-out"></span>
+            <div class="component-title">WATER TANK</div>
+            <div class="visual-container">
+                <div class="tank-visual"><div id="vis-tank" class="tank-water" style="height: 100%;"></div></div>
+            </div>
+            <div id="lbl-tank" class="status-text">500 mL</div>
+        </div>
+        <div id="arr-0" class="process-arrow"></div>
+
+        <div id="cmp-pump" class="component">
+            <span class="port-in"></span><span class="port-out"></span>
+            <div class="component-title">12V PUMP</div>
+            <div class="visual-container"><div class="pump-icon"></div></div>
+            <div id="lbl-pump" class="status-text">OFF</div>
+        </div>
+        <div id="arr-1" class="process-arrow"></div>
+
+        <div id="cmp-flow" class="component">
+            <span class="port-in"></span><span class="port-out"></span>
+            <div class="component-title">FLOW SENSOR</div>
+            <div class="visual-container"><div class="sensor-symbol">F</div></div>
+            <div id="lbl-flow" class="status-text">0 mL/s</div>
+        </div>
+        <div id="arr-2" class="process-arrow"></div>
+
+        <div id="cmp-powder" class="component">
+            <span class="port-in"></span><span class="port-out"></span>
+            <div class="component-title">HERBAL POWDER</div>
+            <div class="visual-container">
+                <div class="hopper-visual">
+                    <div class="powder-drop" style="left:-8px;"></div>
+                    <div class="powder-drop" style="left:0px; animation-delay:0.2s;"></div>
+                    <div class="powder-drop" style="left:8px; animation-delay:0.4s;"></div>
+                </div>
+            </div>
+            <div id="lbl-powder" class="status-text">POD</div>
+        </div>
+        <div id="arr-3" class="process-arrow"></div>
+
+        <div id="cmp-pot" class="component" style="height: 170px;">
+            <span class="port-in"></span><span class="port-out"></span>
+            <div class="component-title" style="color:var(--gold);">STAINLESS STEEL POT + PTC</div>
+            <div class="visual-container" style="flex-direction: column;">
+                <div class="pot-visual">
+                    <div id="vis-pot" class="pot-liquid"></div>
+                </div>
+                <div class="heater-element"></div>
+            </div>
+            <div id="lbl-pot" class="status-text" style="color:var(--gold);">0 mL</div>
+        </div>
+        <div id="arr-4" class="process-arrow"></div>
+
+        <div id="cmp-fan" class="component">
+            <span class="port-in"></span><span class="port-out"></span>
+            <div class="component-title">EXHAUST FAN</div>
+            <div class="visual-container">
+                <div class="fan-housing">
+                    <div class="steam"></div>
+                    <div class="fan-blades"></div>
+                </div>
+            </div>
+            <div id="lbl-fan" class="status-text">OFF</div>
+        </div>
+        <div id="arr-5" class="process-arrow"></div>
+
+        <div id="cmp-valve" class="component">
+            <span class="port-in"></span><span class="port-out"></span>
+            <div class="component-title">DISPENSE VALVE</div>
+            <div class="visual-container"><div id="vis-valve" class="valve-symbol"></div></div>
+            <div id="lbl-valve" class="status-text">CLOSED</div>
+        </div>
+        <div id="arr-6" class="process-arrow"></div>
+
+        <div id="cmp-cup" class="component">
+            <span class="port-in"></span>
+            <div class="component-title">USER GLASS</div>
+            <div class="visual-container">
+                <div class="cup-visual"><div id="vis-cup" class="cup-liquid"></div></div>
+            </div>
+            <div id="lbl-cup" class="status-text">0 mL</div>
+        </div>
+
+    </div>
+
+    <!-- ESP32 & BLYNK CONTROL AREA -->
+    <div class="control-zone">
+        <div class="connection-box">
+            <div class="box-title">ESP32 SENSORS</div>
+            <div class="connection-item"><span>Reservoir Level</span><span id="sns-tank" class="val">500 mL</span></div>
+            <div class="connection-item"><span>Flow Meter Target</span><span class="val">100 mL</span></div>
+            <div class="connection-item"><span>Pot Volume</span><span id="sns-pot" class="val">0 mL</span></div>
+        </div>
+        
+        <div class="esp32-board">
+            <div style="color:var(--muted); font-size:10px; letter-spacing:1.5px; font-weight:700; margin-bottom: 10px;">CONTROL CORE</div>
+            <div class="esp-chip">ESP32</div>
+            <div class="blynk-chip"><div class="blynk-indicator"></div> BLYNK IoT</div>
+            <div id="esp-state" style="font-size:12px; color:var(--blue); font-weight:700; margin-top:15px; text-transform: uppercase;">STANDBY</div>
+        </div>
+
+        <div class="connection-box">
+            <div class="box-title">ESP32 ACTUATORS</div>
+            <div class="connection-item"><span>Pump Relay</span><span id="act-pump" class="val" style="color:var(--muted)">LOW</span></div>
+            <div class="connection-item"><span>Powder Servo</span><span id="act-servo" class="val" style="color:var(--muted)">0°</span></div>
+            <div class="connection-item"><span>Heater SSR</span><span id="act-heater" class="val" style="color:var(--muted)">LOW</span></div>
+            <div class="connection-item"><span>Exhaust Fan</span><span id="act-fan" class="val" style="color:var(--muted)">LOW</span></div>
+            <div class="connection-item"><span>Dispense Valve</span><span id="act-valve" class="val" style="color:var(--muted)">CLOSED</span></div>
+        </div>
+        <div class="dashboard-col">
+        <div class="panel">
+            <div class="panel-title">USER INPUT</div>
+            <div class="input-row">
+                <label>Concentration</label>
+                <select id="concentrationSelect" onchange="updateConcentrationConfig()">
+                    <option value="1">Mild</option>
+                    <option value="2" selected>Moderate</option>
+                    <option value="3">Strong</option>
+                </select>
+            </div>
+            <div id="main-status" class="status" style="margin-top: 10px;">READY - TAP "START"</div>
+        </div>
+    </div>
+    </div>
+</section>
+
+<!-- BOTTOM SECTION: DASHBOARD PANELS -->
+<section class="dashboard">
+    <div class="dashboard-col">
+        <div class="panel h-100">
+            <div class="panel-title">Live Telemetry</div>
+            <div class="metrics">
+                <div class="metric"><div class="metric-label">WATER TANK</div><div id="met-tank" class="metric-value">500 mL</div></div>
+                <div class="metric"><div class="metric-label">POT VOLUME</div><div id="met-pot" class="metric-value">0 mL</div></div>
+                <div class="metric"><div class="metric-label">EVAPORATED</div><div id="met-evap" class="metric-value" style="color:var(--cyan);">0 mL</div></div>
+                <div class="metric"><div class="metric-label">USER GLASS</div><div id="met-cup" class="metric-value" style="color:var(--gold);">0 mL</div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-col">
+        <div class="panel h-100">
+            <div class="panel-title">ESP32 Sequence</div>
+            <div class="process-list">
+                <div id="st-0" class="process-step">1. IDLE</div>
+                <div id="st-1" class="process-step">2. PUMP 100mL</div>
+                <div id="st-2" class="process-step">3. DROP POWDER</div>
+                <div id="st-3" class="process-step">4. BOIL & EVAP</div>
+                <div id="st-4" class="process-step">5. EXHAUST STEAM</div>
+                <div id="st-5" class="process-step">6. DISPENSE 25mL</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-col">
+        <div class="panel h-100">
+            <div class="panel-title">Serial Monitor</div>
+            <div id="serial" class="serial">> ESP32 Connected to WiFi...<br>> IP: 192.168.1.105<br>> Authenticating to Blynk Cloud...<br>> System Ready.</div>
+        </div>
+    </div>
+</section>
+</main>
+
+<script>
+// Logic Variables
+let sim = {
+    running: false,
+    state: 0,
+    timer: 0,
+    concentration: 2, // 1: Mild, 2: Moderate, 3: Strong
+    physics: {
+        tank: 500, 
+        pot: 0,
+        evaporated: 0,
+        cup: 0
+    }
+};
+
+let loopInterval;
+const $ = id => document.getElementById(id);
+
+function log(msg) {
+    const s = $("serial");
+    s.innerHTML += `<br>> [${String(sim.timer).padStart(2,'0')}s] ${msg}`;
+    s.scrollTop = s.scrollHeight;
+}
+
+function setValColor(id, active) {
+    $(id).style.color = active ? 'var(--blue)' : 'var(--muted)';
+}
+
+function updateConcentrationConfig() {
+    sim.concentration = parseInt($("concentrationSelect").value);
+    const names = ["", "Mild (1:16)", "Moderate (1:6)", "Strong (1:4)"];
+    log(`Recipe updated concentration: ${names[sim.concentration]}`);
+    updateLiquidColors();
+}
+
+function updateLiquidColors() {
+    // Deepness mapping based on concentration level
+    let colorHex = "#d97706"; // default amber
+    if (sim.concentration === 1) colorHex = "#d97706"; // lighter amber
+    if (sim.concentration === 2) colorHex = "#b45309"; // rich amber
+    if (sim.concentration === 3) colorHex = "#451a03"; // dark robust extract
+
+    $("vis-pot").style.backgroundColor = colorHex;
+    $("vis-cup").style.backgroundColor = colorHex;
+}
+
+function updateUI() {
+    $("vis-tank").style.height = (sim.physics.tank / 500 * 100) + "%";
+    $("lbl-tank").innerText = Math.round(sim.physics.tank) + " mL";
+    $("sns-tank").innerText = Math.round(sim.physics.tank) + " mL";
+    $("met-tank").innerText = Math.round(sim.physics.tank) + " mL";
+
+    $("vis-pot").style.height = (sim.physics.pot / 100 * 100) + "%";
+    $("lbl-pot").innerText = Math.round(sim.physics.pot) + " mL";
+    $("sns-pot").innerText = Math.round(sim.physics.pot) + " mL";
+    $("met-pot").innerText = Math.round(sim.physics.pot) + " mL";
+
+    $("met-evap").innerText = Math.round(sim.physics.evaporated) + " mL";
+
+    $("vis-cup").style.height = (sim.physics.cup / 25 * 100) + "%";
+    $("lbl-cup").innerText = Math.round(sim.physics.cup) + " mL";
+    $("met-cup").innerText = Math.round(sim.physics.cup) + " mL";
+}
+
+function clearNodes() {
+    document.querySelectorAll('.component').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.process-arrow').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll('.process-step').forEach(s => s.classList.remove('active'));
+}
+
+function loopLogic() {
+    sim.timer++;
+
+    if(sim.state === 1) {
+        $("cmp-tank").classList.add("active");
+        $("cmp-pump").classList.add("active");
+        $("cmp-flow").classList.add("active");
+        $("cmp-pot").classList.add("active");
+        $("arr-0").classList.add("active"); $("arr-1").classList.add("active"); $("arr-2").classList.add("active");
+        $("st-1").classList.add("active");
+        
+        $("lbl-pump").innerText = "ON"; $("act-pump").innerText = "HIGH"; setValColor("act-pump", true);
+        $("lbl-flow").innerText = "20 mL/s";
+        $("esp-state").innerText = "PUMPING WATER";
+
+        sim.physics.tank -= 20; 
+        sim.physics.pot += 20;
+
+        if(sim.physics.pot >= 100) {
+            sim.physics.pot = 100;
+            $("lbl-pump").innerText = "OFF"; $("act-pump").innerText = "LOW"; setValColor("act-pump", false);
+            $("lbl-flow").innerText = "0 mL/s";
+            log(`100mL delivered. Tank verified at ${sim.physics.tank}mL.`);
+            sim.state = 2;
+        }
+    } 
+    else if (sim.state === 2) {
+        clearNodes();
+        $("cmp-powder").classList.add("active");
+        $("cmp-pot").classList.add("active");
+        $("st-2").classList.add("active");
+
+        const drops = document.querySelectorAll('.powder-drop');
+        drops.forEach((d, idx) => {
+            if(idx < sim.concentration) {
+                d.style.display = "block";
+                d.classList.add("active");
+            } else {
+                d.style.display = "none";
+            }
+        });
+
+        $("lbl-powder").innerText = `SERVO 90° (${sim.concentration} Drop)`; 
+        $("act-servo").innerText = "90°"; 
+        setValColor("act-servo", true);
+        $("esp-state").innerText = "DROPPING POWDER";
+
+        if(sim.timer % 3 === 0) {
+            drops.forEach(d => d.classList.remove("active"));
+            $("lbl-powder").innerText = "POD"; 
+            $("act-servo").innerText = "0°"; 
+            setValColor("act-servo", false);
+            log(`Coarse Herbal Powder added (${sim.concentration} drop profile / ratio applied).`);
+            sim.state = 3;
+        }
+    }
+    else if (sim.state === 3) {
+        clearNodes();
+        $("cmp-pot").classList.add("active");
+        $("cmp-fan").classList.add("active");
+        $("st-3").classList.add("active");
+        $("st-4").classList.add("active");
+
+        $("act-heater").innerText = "HIGH"; setValColor("act-heater", true);
+        $("lbl-fan").innerText = "ON"; $("act-fan").innerText = "HIGH"; setValColor("act-fan", true);
+        $("esp-state").innerText = "BOILING & EXHAUSTING STEAM";
+
+        sim.physics.pot -= 5; 
+        sim.physics.evaporated += 5;
+
+        if(sim.physics.pot <= 25) {
+            sim.physics.pot = 25; 
+            sim.physics.evaporated = 75; 
+            $("act-heater").innerText = "LOW"; setValColor("act-heater", false);
+            $("lbl-fan").innerText = "OFF"; $("act-fan").innerText = "LOW"; setValColor("act-fan", false);
+            log("75mL steam exhausted via fan. 25mL concentrated Kadha remains.");
+            sim.state = 4;
+        }
+    }
+    else if (sim.state === 4) {
+        clearNodes();
+        $("cmp-pot").classList.add("active");
+        $("cmp-valve").classList.add("active");
+        $("cmp-cup").classList.add("active");
+        $("arr-6").classList.add("active");
+        $("st-5").classList.add("active");
+
+        $("lbl-valve").innerText = "OPEN"; $("act-valve").innerText = "OPEN"; setValColor("act-valve", true);
+        $("vis-valve").classList.add("open");
+        $("esp-state").innerText = "DISPENSING KADHA";
+
+        sim.physics.pot -= 5;
+        sim.physics.cup += 5;
+
+        if(sim.physics.cup >= 25) {
+            sim.physics.pot = 0;
+            sim.physics.cup = 25;
+            $("lbl-valve").innerText = "CLOSED"; $("act-valve").innerText = "CLOSED"; setValColor("act-valve", false);
+            $("vis-valve").classList.remove("open");
+            log("25mL Kadha transferred to user glass.");
+            sim.state = 5;
+        }
+    }
+    else if (sim.state === 5) {
+        clearNodes();
+        clearInterval(loopInterval);
+        $("main-status").innerText = "CYCLE COMPLETE - SERVE TO USER";
+        $("main-status").className = "status";
+        $("esp-state").innerText = "IDLE";
+        $("st-0").classList.add("active");
+        sim.running = false;
+        log("Notification Sent: Kadha is Ready!");
+    }
+
+    updateUI();
+}
+
+function startSim() {
+    if(sim.running) return;
+    
+    if(sim.physics.tank < 100) {
+        $("main-status").innerText = "ERROR: TANK EMPTY - PLEASE RESET";
+        $("main-status").className = "status stopped";
+        log("[Error] Insufficient water. Refill required.");
+        return;
+    }
+    
+    sim.physics.pot = 0;
+    sim.physics.evaporated = 0;
+    sim.physics.cup = 0;
+    sim.timer = 0;
+    
+    $("main-status").innerText = "COMMAND RECEIVED - RUNNING";
+    $("main-status").className = "status running";
+    clearNodes();
+    updateUI();
+    
+    log(`Beginning execution sequence. Current tank level: ${sim.physics.tank}mL`);
+    
+    sim.running = true;
+    sim.state = 1;
+    loopInterval = setInterval(loopLogic, 800);
+}
+
+function resetSim() {
+    clearInterval(loopInterval);
+    sim.running = false;
+    sim.state = 0;
+    sim.timer = 0;
+    sim.physics = { tank: 500, pot: 0, evaporated: 0, cup: 0 };
+    
+    clearNodes();
+    $("st-0").classList.add("active");
+    $("main-status").innerText = "READY - TAP 'START'";
+    $("main-status").className = "status";
+    $("esp-state").innerText = "STANDBY";
+    
+    $("lbl-pump").innerText = "OFF"; $("act-pump").innerText = "LOW"; setValColor("act-pump", false);
+    $("lbl-flow").innerText = "0 mL/s";
+    $("lbl-powder").innerText = "POD"; $("act-servo").innerText = "0°"; setValColor("act-servo", false);
+    $("act-heater").innerText = "LOW"; setValColor("act-heater", false);
+    $("lbl-fan").innerText = "OFF"; $("act-fan").innerText = "LOW"; setValColor("act-fan", false);
+    $("lbl-valve").innerText = "CLOSED"; $("act-valve").innerText = "CLOSED"; setValColor("act-valve", false);
+    $("vis-valve").classList.remove("open");
+
+    updateLiquidColors();
+    updateUI();
+    $("serial").innerHTML = "> ESP32 Connected to WiFi...<br>> System Reset. Tank refilled to 500mL.";
+}
+
+updateLiquidColors();
+updateUI();
+$("st-0").classList.add("active");
+</script>
+</body>
+</html>
